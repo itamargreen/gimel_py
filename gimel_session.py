@@ -15,7 +15,7 @@ class GimelSession(object):
         self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.client.connect(self.SERVER, username=user,password=password)
         self.shell = self.client.invoke_shell()
-        self.write_data = self.save_output(output_file)
+        self.write_data = self._save_output(output_file)
         """:type : Channel"""
 
     def __enter__(self):
@@ -45,8 +45,8 @@ class GimelSession(object):
     def send_command(self,command=''):
         return self.shell.send(command + '\n')
 
-    def send_particles_in_bulk(self,particle,energie,times):
-        self.send_command(particle + ' ' + str(energie))
+    def send_particle_in_bulk(self, particle, energy, times):
+        self.send_command(particle + ' ' + str(energy))
         for i in range(times):
             self.send_command('inject')
 
@@ -60,10 +60,10 @@ class GimelSession(object):
         self.send_command('inject')
 
 
-    def save_output(self,file):
-        return Thread(target=self.output_thread, args=(file,))
+    def _save_output(self, file):
+        return Thread(target=self._output_thread, args=(file,))
 
-    def output_thread(self, output_file):
+    def _output_thread(self, output_file):
         string = b''
         geant = re.compile(r'GEANT > $')
         with open(output_file, 'wb'):
