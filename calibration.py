@@ -30,4 +30,3 @@ if __name__ == '__main__':
         dataset.append(row)
     with open(EXEL_OUTPUT, 'wb') as f:
         f.write(dataset.export('xlsx'))
-    dataset.export('sheets',name=EXEL_OUTPUT)
