@@ -51,6 +51,7 @@ class Event(object):
             text = data
         else:
             text = ''
+        self.raw = text
         partitions = self._separate(text)
         for key in self._objects:
             obj = getattr(self, key)
@@ -60,6 +61,9 @@ class Event(object):
             else:
                 string = ''
             setattr(self, key, obj(string))
+
+    def __str__(self):
+        return self.raw
 
     @staticmethod
     def _separate(text):
@@ -127,7 +131,7 @@ class Verteces(Report):
     def _initial_parse(string):
         result = []
         resultant = namedtuple('Vertex', ('name', 'text'))
-        separator = re.compile(r'\s+(Tracks\s+\d and\s+\d)\n\s+====================\n')
+        separator = VERTECES_REGEX
         start = separator.search(string)
         while start:
             former = start
@@ -144,6 +148,8 @@ class Coordinate(object):
         self.value = value
         self.error = error
 
+    def __str__(self):
+        return '{} +/- {}'.format(self.value,self.error)
 
 class Vertex(Report):
 
@@ -172,7 +178,7 @@ class Vertex(Report):
 
     @staticmethod
     def _parse(string):
-        fun = re.compile('(\w+)\s*=\s+(-?\d+\.\d+)\s\+/-\s+(\d+\.\d+)')
+        fun = VERTEX_REGEX
         start = fun.search(string)
         result = []
         while start:
@@ -188,7 +194,8 @@ class Calorimeter(Report):
         table_string = string[:index]
         clusters_string = string[index:]
         self.hit_table = self._prepare_table(table_string)
-        self.clusters = self._prepare_cluters(clusters_string)
+        self.clusters = Clusters(self._prepare_cluters(clusters_string))
+        """:type : Clusters"""
         super().__init__(string)
 
     @staticmethod
@@ -227,8 +234,56 @@ class Calorimeter(Report):
         return dataset
 
 
+class Clusters(Report):
+    def __init__(self, data):
+        """
+
+        :param Dataset data:
+        """
+        self.clusters = self._prepare_clusters(data)
+        """:type : list[Cluster]"""
+        super().__init__(data)
+
+    def _prepare_clusters(self,data):
+        return [Cluster(dict_row) for dict_row in data.dict]
+
+
+class Cluster(Report):
+
+    def __init__(self, data):
+
+        self.x = None
+        """:type : Coordinate"""
+
+        self.y = None
+        """:type : Coordinate"""
+
+        self.z = None
+        """:type : Coordinate"""
+
+        self.pulse_height = None
+        """:type : float"""
+
+        self.no = None
+        """:type : int"""
+
+        self.ywidth = None
+        """:type : float"""
+
+        self.zwidth = None
+        """:type : float"""
+        for key, value in data.items():
+            key = key.replace('-', '_').lower().replace('.', '')
+            if key in ['x', 'y', 'z']:
+                found = COORDINATE_REGEX.search(value)
+                value = Coordinate(numberfy(found.group(1)), numberfy(found.group(2)))
+            setattr(self, key, value)
+
+        super().__init__(data)
+
 class Spectrometer(Report):
     def __init__(self, string):
+        string = _escape_minus_signs(string)
         self.table = self._prepare_table(string)
         """:type : Dataset"""
 
@@ -237,6 +292,7 @@ class Spectrometer(Report):
     @staticmethod
     def _prepare_table(string):
         dataset = Dataset()
+        good = None
         for i, line in enumerate(string.split('\n')[1:]):
             if '====' in line or not line:
                 continue
@@ -244,7 +300,13 @@ class Spectrometer(Report):
             if i == 1:
                 dataset.headers = row
             else:
-                dataset.append([numberfy(num) for num in row])
+                if len(row) == len(dataset.headers):
+                    good = line
+                    dataset.append([numberfy(num) for num in row])
+                else:
+                    print(good)
+                    print(row)
+
         return dataset
 
 
@@ -265,13 +327,13 @@ class Tracks(Report):
             former = start
             start = separator.search(string, pos=start.end())
             end = start.start() if start else len(string)
-            result.append(Track(string[former.end():end].strip('\n')))
+            result.append(Track(string[former.end():end].strip('\n'),former.group(1)))
         return result
 
 
 class Track(Report):
 
-    def __init__(self, string):
+    def __init__(self, string, number=0):
         indecies = self._separate(string)
         table_string = string[:indecies[0]]
         param_string = string[indecies[0]:indecies[1]]
@@ -285,6 +347,9 @@ class Track(Report):
 
         self.error_matrix = self._prapare_matrix(error_string)
         """:type : dict"""
+
+        self.num = number
+        """:type : int"""
 
         super().__init__(string)
 
@@ -388,7 +453,7 @@ def numberfy(string):
 
 def _initial_parse(text):
 
-    separator = re.compile(r'GEANT > ([a-z0-]+) ([\d.]+)')
+    separator = INITIAL_REGEX
     start = separator.search(text)
     result = []
     resultant = namedtuple('particle_group', ('name', 'energy', 'string'))
@@ -406,7 +471,7 @@ def _initial_parse(text):
 
 def _secondary_parse(parsed_data):
     resultant = namedtuple('particle', ('particle', 'energy', 'datetime', 'string'))
-    separator = re.compile(r'GEANT > inject\s+A new event at\s+(\d\d\.\d\d\.\d\d\s\d\d/\d\d/\d\d\d\d)')
+    separator = SECONDERY_REGEX
     result = []
     for particle_group in parsed_data:
         text = particle_group.string
@@ -424,5 +489,16 @@ def _secondary_parse(parsed_data):
     return result
 
 
+def _escape_minus_signs(string):
+    fuck = re.compile('\d+-\d+')
+    match = fuck.search(string)
+    if not match:
+        return string
+    minus_location = match.group().find('-') + match.start()
+    string = string[:minus_location] + ' ' + string[minus_location:]
+    return _escape_minus_signs(string)
+
+
 def parse(text):
     return [Event(event) for event in _secondary_parse(_initial_parse(text))]
+
