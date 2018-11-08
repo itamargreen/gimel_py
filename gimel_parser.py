@@ -131,7 +131,7 @@ class Verteces(Report):
     def _initial_parse(string):
         result = []
         resultant = namedtuple('Vertex', ('name', 'text'))
-        separator = VERTECES_REGEX
+        separator = re.compile(r'\s+(Tracks\s+\d and\s+\d)\n\s+====================\n')
         start = separator.search(string)
         while start:
             former = start
@@ -178,7 +178,7 @@ class Vertex(Report):
 
     @staticmethod
     def _parse(string):
-        fun = VERTEX_REGEX
+        fun = re.compile(r'(\w+)\s*=\s+(-?\d+\.\d+)\s\+/-\s+(\d+\.\d+)')
         start = fun.search(string)
         result = []
         while start:
@@ -195,6 +195,7 @@ class Calorimeter(Report):
         clusters_string = string[index:]
         self.hit_table = self._prepare_table(table_string)
         self.clusters = Clusters(self._prepare_cluters(clusters_string))
+
         """:type : Clusters"""
         super().__init__(string)
 
@@ -222,15 +223,16 @@ class Calorimeter(Report):
     @staticmethod
     def _prepare_cluters(string):
         dataset = Dataset()
-        string = string.replace('PULSE HEIGHT', 'PULSE-HEIGHT').replace(' +/-', '_+/-')
-        for i, line in enumerate(string.split('\n')[3:]):
+        stringRep = string.replace('PULSE HEIGHT', 'PULSE-HEIGHT').replace(' +/-', '_+/-')
+        for i, line in enumerate(stringRep.split('\n')[3:]):
             if '*****' in line or not line:
                 continue
-            line = line.split()
+
+            parts = line.split()
             if i == 0:
-                dataset.headers = line
+                dataset.headers = parts
             else:
-                dataset.append([numberfy(cell.replace('_', ' ')) for cell in line])
+                dataset.append([numberfy(cell.replace('_', ' ')) for cell in parts])
         return dataset
 
 
@@ -245,12 +247,16 @@ class Clusters(Report):
         super().__init__(data)
 
     def _prepare_clusters(self,data):
-        return [Cluster(dict_row) for dict_row in data.dict]
+        thing=[Cluster(dict_row) for dict_row in data.dict]
+
+        return thing
+
 
 
 class Cluster(Report):
 
     def __init__(self, data):
+        thing = re.compile(r'\s*(-?\d+\.\d+)\s\+/-(\d+\.\d+)\s*')
 
         self.x = None
         """:type : Coordinate"""
@@ -273,12 +279,12 @@ class Cluster(Report):
         self.zwidth = None
         """:type : float"""
         for key, value in data.items():
-            key = key.replace('-', '_').lower().replace('.', '')
-            if key in ['x', 'y', 'z']:
-                found = COORDINATE_REGEX.search(value)
-                value = Coordinate(numberfy(found.group(1)), numberfy(found.group(2)))
-            setattr(self, key, value)
-
+            newkey=key.replace('-', '_').lower().replace('.', '')
+            newval=value
+            if key.replace('-', '_').lower().replace('.', '') in ['x', 'y', 'z']:
+                found = thing.search(value)
+                newval = Coordinate(numberfy(found.group(1)), numberfy(found.group(2)))
+            setattr(self, newkey, newval)
         super().__init__(data)
 
 class Spectrometer(Report):
@@ -432,8 +438,8 @@ class Parameters(Report):
         for line in string.split('\n')[1:]:
             if '*****' in line or not line:
                 continue
-            line = line.lstrip().strip('*').split('*')[0].split()
-            pair = (line[1].lower(), float(line[0]))
+            params = line.lstrip().strip('*').split('*')[0].split()
+            pair = (params[1].lower(), float(params[0]))
             result.append(pair)
         return result
 
@@ -453,7 +459,7 @@ def numberfy(string):
 
 def _initial_parse(text):
 
-    separator = INITIAL_REGEX
+    separator = re.compile(r'GEANT > ([a-z0-]+) ([\d.]+)')
     start = separator.search(text)
     result = []
     resultant = namedtuple('particle_group', ('name', 'energy', 'string'))
@@ -471,7 +477,7 @@ def _initial_parse(text):
 
 def _secondary_parse(parsed_data):
     resultant = namedtuple('particle', ('particle', 'energy', 'datetime', 'string'))
-    separator = SECONDERY_REGEX
+    separator = re.compile(r'GEANT > inject\s+A new event at\s+(\d\d\.\d\d\.\d\d\s\d\d/\d\d/\d\d\d\d)')
     result = []
     for particle_group in parsed_data:
         text = particle_group.string

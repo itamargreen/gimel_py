@@ -50,9 +50,10 @@ class GimelSession(object):
         for i in range(times):
             self.send_command('inject')
 
-    def send_particles_ascending_energies(self, particle, initial_energie, delta, times):
+    def send_particles_ascending_energies(self, particle, initial_energie, delta, times,mult):
         for i in range(times):
-            self.inject_particle(particle, initial_energie)
+            # self.inject_particle(particle, initial_energie)
+            self.send_particle_in_bulk(particle,initial_energie, mult)
             initial_energie += delta
 
     def inject_particle(self,particle,energie):

@@ -47,8 +47,8 @@ class ssh:
                     print("\n$ ", end="")
 
 
-sshUsername = "yaakovko"
-sshPassword = "Trhbdmu1"
+sshUsername = ""
+sshPassword = ""
 sshServer = "gp.tau.ac.il"
 
 connection = ssh(sshServer, sshUsername, sshPassword)
