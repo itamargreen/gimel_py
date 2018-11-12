@@ -37,7 +37,7 @@ class ssh:
         while True:
             # Print data when available
             if self.shell != None and self.shell.recv_ready():
-                alldata = self.shell.recv(1024)
+                alldata = self.shell.recv(4096)
                 while self.shell.recv_ready():
                     alldata += self.shell.recv(1024)
                 strdata = alldata.decode('cp862')

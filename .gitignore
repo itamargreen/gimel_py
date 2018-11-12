@@ -3,3 +3,6 @@ __pycache__/*
 *.txt
 *.csv
 *.xls*
+auth.json
+part2.py
+*.m

@@ -474,9 +474,28 @@ def _initial_parse(text):
         result.append(r)
     return result
 
+def _initial_parse_l(text):
+
+    separator = re.compile(r'\s+A new event at\s+(\d\d\.\d\d\.\d\d\s\d\d/\d\d/\d\d\d\d)')
+    print('text is {}'.format(text))
+    start = separator.search(text)
+    result = []
+    resultant = namedtuple('particle_group', ('number','string'))
+    i=1
+    while start:
+        former = start
+        start = separator.search(text, pos=start.start() + 1)
+        end = start.start() if start else len(text)
+        r = resultant(
+            number=i,
+            string=text[former.end():end]
+        )
+        result.append(r)
+        i=i+1
+    return result
 
 def _secondary_parse(parsed_data):
-    resultant = namedtuple('particle', ('particle', 'energy', 'datetime', 'string'))
+    resultant = namedtuple('particle', ('particle', 'energy','datetime', 'string'))
     separator = re.compile(r'GEANT > inject\s+A new event at\s+(\d\d\.\d\d\.\d\d\s\d\d/\d\d/\d\d\d\d)')
     result = []
     for particle_group in parsed_data:
@@ -494,6 +513,27 @@ def _secondary_parse(parsed_data):
             result.append(r)
     return result
 
+def _loto_parse(parsed_data):
+    resultant = namedtuple('particle', ('particle', 'string'))
+#(\d\d\.\d\d\.\d\d\s\d\d/\d\d/\d\d\d\d)\s+\*+Event No\.\s+(\d)
+    separator = re.compile(r'(GEANT > testme)|(\s+\*+\sEvent No\.\s+(\d)\s+\*+\s+)')
+    result = []
+    for particle_group in parsed_data:
+        text = particle_group.string
+        if text is '':
+            continue
+        start = separator.search(text)
+
+        while start:
+            former = start
+            start = separator.search(text, pos=start.start() + 1)
+            end = start.start() if start else len(text)
+            r = resultant(
+                particle=particle_group.number,
+                string=text[former.end():end]
+            )
+            result.append(r)
+    return result
 
 def _escape_minus_signs(string):
     fuck = re.compile('\d+-\d+')
@@ -508,3 +548,5 @@ def _escape_minus_signs(string):
 def parse(text):
     return [Event(event) for event in _secondary_parse(_initial_parse(text))]
 
+def parseLoto(text):
+    return [Event(event) for event in _loto_parse(_initial_parse_l(text))]

@@ -25,7 +25,7 @@ class GimelSession(object):
     def __exit__(self, *args):
         self.write_data.join()
 
-    def start_gimmel(self, output_mode=None, changes=None, **kwargs):
+    def start_gimmel(self, output_mode=None, loto=None, changes=None, **kwargs):
         output_mode = output_mode or '0'
         self.send_command('cd gimel')
         self.send_command('gimel')
@@ -34,6 +34,9 @@ class GimelSession(object):
             self.send_command('n')
         if changes == 'magnet':
             self.change_magnetic_field(kwargs.get('alpha',1))
+        if loto is not None:
+            self.send_command('loto\n')
+            self.send_command('319127841')
 
     def change_magnetic_field(self, alpha):
         self.send_command('y')
@@ -60,22 +63,30 @@ class GimelSession(object):
         self.send_command(particle + ' ' + str(energie))
         self.send_command('inject')
 
+    def run_testme(self,times):
+        for i in range(times):
+            self.send_command('testme')
 
     def _save_output(self, file):
         return Thread(target=self._output_thread, args=(file,))
 
     def _output_thread(self, output_file):
         string = b''
-        geant = re.compile(r'GEANT > $')
+        geant = re.compile(r'(GEANT > $)')
+        id_ready = re.compile(r'(.*ENTER YOUR ID NO\.)|(\*{53,53}$)')
         with open(output_file, 'wb'):
             pass
 
         while True:
             if self.shell.recv_ready():
                 while self.shell.recv_ready():
-                    string += self.shell.recv(1024)
+                    string += self.shell.recv(8192)
                 s = string.decode(decode)
                 shit = geant.search(s)
+                idr = id_ready.search(s)
+                if idr:
+                    string = string[:idr.start()].rstrip()
+                    self.send_command('319127841')
                 if shit:
                     string = string[:shit.start()].rstrip()
                 with open(output_file, 'ab') as f:
