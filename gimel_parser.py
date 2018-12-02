@@ -5,7 +5,9 @@ from constants import *
 
 
 class Event(object):
-    _objects = ['calorimeter',
+    _objects = [
+                'calorimeter',
+                'clusters',
                 'spectrometer',
                 'muon',
                 'tracks',
@@ -41,6 +43,9 @@ class Event(object):
         self.verteces = Verteces
         """:type : Verteces"""
 
+        self.clusters = Clusters
+        """:type : Clusters"""
+
         for key in self._regular:
             if hasattr(data, key):
                 value = getattr(data, key)
@@ -69,11 +74,11 @@ class Event(object):
     def _separate(text):
         result = OrderedDict(
             calorimeter=CALORIMETER_STRING,
+            clusters=EM_CLUSTER,
             spectrometer=SPECTROMETER_STRING,
             muon=MUON_STRING,
             tracks=TRACKS_STRING,
             verteces=VERTECES_STRING
-
         )
         for key in result.copy():
             value = text.find(result[key])
@@ -131,13 +136,15 @@ class Verteces(Report):
     def _initial_parse(string):
         result = []
         resultant = namedtuple('Vertex', ('name', 'text'))
-        separator = re.compile(r'\s+(Tracks\s+\d and\s+\d)\n\s+====================\n')
+        separator = re.compile(
+            r'\s+(Tracks\s+\d and\s+\d)\n\s+====================\n')
         start = separator.search(string)
         while start:
             former = start
             start = separator.search(string, pos=start.end())
             end = start.start() if start else len(string)
-            r = resultant(name=' '.join(former.group(1).split()), text=string[former.end():end])
+            r = resultant(name=' '.join(former.group(1).split()),
+                          text=string[former.end():end])
             result.append(r)
         return [Vertex(vertex) for vertex in result]
 
@@ -149,7 +156,8 @@ class Coordinate(object):
         self.error = error
 
     def __str__(self):
-        return '{} +/- {}'.format(self.value,self.error)
+        return '{} +/- {}'.format(self.value, self.error)
+
 
 class Vertex(Report):
 
@@ -182,7 +190,8 @@ class Vertex(Report):
         start = fun.search(string)
         result = []
         while start:
-            result.append((start.group(1).lower(), Coordinate(float(start.group(2)), float(start.group(3)))))
+            result.append((start.group(1).lower(), Coordinate(
+                float(start.group(2)), float(start.group(3)))))
             start = fun.search(string, pos=start.end())
         return result
 
@@ -223,16 +232,20 @@ class Calorimeter(Report):
     @staticmethod
     def _prepare_cluters(string):
         dataset = Dataset()
-        stringRep = string.replace('PULSE HEIGHT', 'PULSE-HEIGHT').replace(' +/-', '_+/-')
+        stringRep = string.replace(
+            'PULSE HEIGHT', 'PULSE-HEIGHT').replace(' +/-', '_+/-')
         for i, line in enumerate(stringRep.split('\n')[3:]):
-            if '*****' in line or not line:
+            if '*****' in line or not line or 'GEANT' in line:
                 continue
-
+            if 'NO.  PULSE-HEIGHT' not in line and '+/-' not in line:
+                continue
             parts = line.split()
             if i == 0:
                 dataset.headers = parts
             else:
-                dataset.append([numberfy(cell.replace('_', ' ')) for cell in parts])
+                if '+/-' in line:
+                    dataset.append([numberfy(cell.replace('_', ' '))
+                                    for cell in parts])
         return dataset
 
 
@@ -242,15 +255,35 @@ class Clusters(Report):
 
         :param Dataset data:
         """
-        self.clusters = self._prepare_clusters(data)
+        if isinstance(data, str):
+            self.clusters = Clusters(self._prepare_clusters_str(data))
+        else:
+            self.clusters = self._prepare_clusters(data)
         """:type : list[Cluster]"""
         super().__init__(data)
 
-    def _prepare_clusters(self,data):
-        thing=[Cluster(dict_row) for dict_row in data.dict]
+    def _prepare_clusters(self, data):
+        thing = [Cluster(dict_row) for dict_row in data.dict]
 
         return thing
 
+    def _prepare_clusters_str(self, data):
+        dataset = Dataset()
+        stringRep = data.replace(
+            'PULSE HEIGHT', 'PULSE-HEIGHT').replace(' +/-', '_+/-')
+        for i, line in enumerate(stringRep.split('\n')[3:]):
+            if '*****' in line or not line or 'GEANT' in line:
+                continue
+            if 'NO.  PULSE-HEIGHT' not in line and '+/-' not in line:
+                continue
+            parts = line.split()
+            if i == 0:
+                dataset.headers = parts
+            else:
+                if '+/-' in line:
+                    dataset.append([numberfy(cell.replace('_', ' '))
+                                    for cell in parts])
+        return dataset
 
 
 class Cluster(Report):
@@ -278,14 +311,17 @@ class Cluster(Report):
 
         self.zwidth = None
         """:type : float"""
+
         for key, value in data.items():
-            newkey=key.replace('-', '_').lower().replace('.', '')
-            newval=value
+            newkey = key.replace('-', '_').lower().replace('.', '')
+            newval = value
             if key.replace('-', '_').lower().replace('.', '') in ['x', 'y', 'z']:
                 found = thing.search(value)
-                newval = Coordinate(numberfy(found.group(1)), numberfy(found.group(2)))
+                newval = Coordinate(numberfy(found.group(1)),
+                                    numberfy(found.group(2)))
             setattr(self, newkey, newval)
         super().__init__(data)
+
 
 class Spectrometer(Report):
     def __init__(self, string):
@@ -333,7 +369,8 @@ class Tracks(Report):
             former = start
             start = separator.search(string, pos=start.end())
             end = start.start() if start else len(string)
-            result.append(Track(string[former.end():end].strip('\n'),former.group(1)))
+            result.append(
+                Track(string[former.end():end].strip('\n'), former.group(1)))
         return result
 
 
@@ -345,17 +382,18 @@ class Track(Report):
         param_string = string[indecies[0]:indecies[1]]
         error_string = string[indecies[1]:]
 
+        self.num = number
+        """:type : int"""
+
         self.table = self._prepare_table(table_string)
         """:type : Dataset"""
 
         self.parameters = Parameters(param_string)
         """:type : Parameters"""
 
-        self.error_matrix = self._prapare_matrix(error_string)
-        """:type : dict"""
+        # self.error_matrix = self._prapare_matrix(error_string)
+        # """:type : dict"""
 
-        self.num = number
-        """:type : int"""
 
         super().__init__(string)
 
@@ -372,9 +410,15 @@ class Track(Report):
                 row.append(cell)
             result.append(row)
         dataset = Dataset()
-        dataset.headers = result[0]
-        for row in result[1:]:
-            dataset.append([numberfy(i) for i in row])
+        head = 0
+        if result[0][0] is '':
+            head = 1
+        else:
+            head = 0
+        dataset.headers = result[head]
+        for row in result[head+1:]:
+            if row[0] is not '':
+                dataset.append([numberfy(i) for i in row])
         return dataset
 
     @staticmethod
@@ -398,7 +442,9 @@ class Track(Report):
 
         for i, line in enumerate(lines):
 
-            if '*****' in line or not line:
+            if len(line.lstrip().split('*')) in [4,6]:
+                continue
+            if '*****' in line or not line or 'Fit' in line or 'Track' in line:
                 continue
             line = line.lstrip().lstrip('*').split()
             d = {}
@@ -407,13 +453,22 @@ class Track(Report):
                 headlines = line
             else:
                 for j, value in enumerate(line):
+                    if value in headlines:
+                        continue
+                    if j!=0:
+                        try:
+                            float(value)
+                        except ValueError:
+                            print('here')
+
                     if j == 0:
                         t.append(value.lower())
                     else:
-                            d[headlines[j - 1].lower()] = float(value)
+                        d[headlines[j - 1].lower()] = float(value)
                 t.append(d)
                 t = tuple(t)
                 result.append(t)
+
 
         return dict(result)
 
@@ -474,14 +529,16 @@ def _initial_parse(text):
         result.append(r)
     return result
 
+
 def _initial_parse_l(text):
 
-    separator = re.compile(r'\s+A new event at\s+(\d\d\.\d\d\.\d\d\s\d\d/\d\d/\d\d\d\d)')
+    separator = re.compile(
+        r'\s+A new event at\s+(\d\d\.\d\d\.\d\d\s\d\d/\d\d/\d\d\d\d)')
     print('text is {}'.format(text))
     start = separator.search(text)
     result = []
-    resultant = namedtuple('particle_group', ('number','string'))
-    i=1
+    resultant = namedtuple('particle_group', ('number', 'string'))
+    i = 1
     while start:
         former = start
         start = separator.search(text, pos=start.start() + 1)
@@ -491,12 +548,15 @@ def _initial_parse_l(text):
             string=text[former.end():end]
         )
         result.append(r)
-        i=i+1
+        i = i+1
     return result
 
+
 def _secondary_parse(parsed_data):
-    resultant = namedtuple('particle', ('particle', 'energy','datetime', 'string'))
-    separator = re.compile(r'GEANT > inject\s+A new event at\s+(\d\d\.\d\d\.\d\d\s\d\d/\d\d/\d\d\d\d)')
+    resultant = namedtuple(
+        'particle', ('particle', 'energy', 'datetime', 'string'))
+    separator = re.compile(
+        r'GEANT > inject\s+A new event at\s+(\d\d\.\d\d\.\d\d\s\d\d/\d\d/\d\d\d\d)')
     result = []
     for particle_group in parsed_data:
         text = particle_group.string
@@ -513,10 +573,12 @@ def _secondary_parse(parsed_data):
             result.append(r)
     return result
 
+
 def _loto_parse(parsed_data):
     resultant = namedtuple('particle', ('particle', 'string'))
-#(\d\d\.\d\d\.\d\d\s\d\d/\d\d/\d\d\d\d)\s+\*+Event No\.\s+(\d)
-    separator = re.compile(r'(GEANT > testme)|(\s+\*+\sEvent No\.\s+(\d)\s+\*+\s+)')
+# (\d\d\.\d\d\.\d\d\s\d\d/\d\d/\d\d\d\d)\s+\*+Event No\.\s+(\d)
+    separator = re.compile(
+        r'(GEANT > testme)|(\s+\*+\sEvent No\.\s+(\d)\s+\*+\s+)')
     result = []
     for particle_group in parsed_data:
         text = particle_group.string
@@ -535,6 +597,7 @@ def _loto_parse(parsed_data):
             result.append(r)
     return result
 
+
 def _escape_minus_signs(string):
     fuck = re.compile('\d+-\d+')
     match = fuck.search(string)
@@ -547,6 +610,7 @@ def _escape_minus_signs(string):
 
 def parse(text):
     return [Event(event) for event in _secondary_parse(_initial_parse(text))]
+
 
 def parseLoto(text):
     return [Event(event) for event in _loto_parse(_initial_parse_l(text))]

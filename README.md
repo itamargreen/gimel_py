@@ -1,7 +1,7 @@
 # gimel_py
 python library for running particle accelerator simulator 'gimel' Tel-Aviv University
 
-# Before using
+## Before using
 
 Before using this code, one must create a file named `auth.json` in the directory of the code. this file must have the following format:
 
@@ -17,3 +17,7 @@ Before using this code, one must create a file named `auth.json` in the director
 
 the username and password must be the same as those needed to access an account on `gp.tau.ac.il` via `ssh` (i.e. you need to have a general physics account in Tel Aviv University)
 
+## Instructions
+
+1. Select the particle to be injected in `calibration.py`, line 18. Other injection properties can be set there.
+2. Make sure you are connected to the internet.

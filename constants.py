@@ -12,6 +12,4 @@ VERTECES_STRING = '''          CHARGED TRACKS VERTECES RECONSTRUCTION
 TRACKS_RE = re.compile(r'\s+Track No.   (\d)\s+=============')
 FIT_PARAM = ' *                             Fit Parameters                              *'
 FIT_ERROR = ' *                             Fit Error Matrix'
-EM_CLUSTER = """          ELECTROMAGNETIC CLUSTERS
-          ========================
-"""
+EM_CLUSTER = '          ELECTROMAGNETIC CLUSTERS'

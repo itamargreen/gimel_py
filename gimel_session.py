@@ -53,11 +53,12 @@ class GimelSession(object):
         for i in range(times):
             self.send_command('inject')
 
-    def send_particles_ascending_energies(self, particle, initial_energie, delta, times,mult):
+    def send_particles_ascending_energies(self, particle, initial_energy, delta, times,mult):
         for i in range(times):
-            # self.inject_particle(particle, initial_energie)
-            self.send_particle_in_bulk(particle,initial_energie, mult)
-            initial_energie += delta
+            for j in range(mult):
+                self.inject_particle(particle,initial_energy)
+            # self.send_particle_in_bulk(particle,initial_energie, mult)
+            initial_energy += delta
 
     def inject_particle(self,particle,energie):
         self.send_command(particle + ' ' + str(energie))
@@ -80,7 +81,7 @@ class GimelSession(object):
         while True:
             if self.shell.recv_ready():
                 while self.shell.recv_ready():
-                    string += self.shell.recv(8192)
+                    string += self.shell.recv(128)
                 s = string.decode(decode)
                 shit = geant.search(s)
                 idr = id_ready.search(s)
